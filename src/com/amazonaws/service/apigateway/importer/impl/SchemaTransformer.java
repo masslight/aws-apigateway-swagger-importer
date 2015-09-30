@@ -29,6 +29,8 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.amazonaws.services.apigateway.model.RestApi;
+
 /**
  * Deserializes and transforms schema schemas into normalized form
  *
@@ -43,11 +45,11 @@ public class SchemaTransformer {
      *
      * @return the json-schema string in flattened form
      */
-    public String flatten(String model, String models) {
-        return getFlattened(deserialize(model), deserialize(models));
+    public String flatten(RestApi api, String model, String models) {
+        return getFlattened(api, deserialize(model), deserialize(models));
     }
 
-    private void buildSchemaReferenceMap(JsonNode model, JsonNode models, Map<String, String> modelMap) {
+    private void buildSchemaReferenceMap(RestApi api, JsonNode model, JsonNode models, Map<String, String> modelMap) {
         Map<JsonNode, JsonNode> refs = new HashMap<>();
         findReferences(model, refs);
 
@@ -56,14 +58,18 @@ public class SchemaTransformer {
 
             String schemaName = getSchemaName(canonicalRef);
 
-            JsonNode subSchema = getSchema(schemaName, models);
+            // JsonNode subSchema = getSchema(schemaName, models);
+
+            // replace reference values with external reference
+
+            replaceExternalRef(api, (ObjectNode) refs.get(ref), schemaName);
 
             // replace reference values with inline definitions
-            replaceRef((ObjectNode) refs.get(ref), schemaName);
+            //replaceRef((ObjectNode) refs.get(ref), schemaName);
 
-            buildSchemaReferenceMap(subSchema, models, modelMap);
+            // buildSchemaReferenceMap(subSchema, models, modelMap);
 
-            modelMap.put(schemaName, serializeExisting(subSchema));
+            //modelMap.put(schemaName, serializeExisting(subSchema));
         }
     }
 
@@ -71,10 +77,10 @@ public class SchemaTransformer {
         return models.findPath(schemaName);
     }
 
-    private String getFlattened(JsonNode model, JsonNode models) {
+    private String getFlattened(RestApi api, JsonNode model, JsonNode models) {
         HashMap<String, String> schemaMap = new HashMap<>();
 
-        buildSchemaReferenceMap(model, models, schemaMap);
+        buildSchemaReferenceMap(api, model, models, schemaMap);
 
         replaceRefs(model, schemaMap);
 
@@ -128,6 +134,13 @@ public class SchemaTransformer {
      */
     private void replaceRef(ObjectNode parent, String schemaName) {
         parent.set("$ref", new TextNode("#/definitions/" + schemaName));
+    }
+
+    /**
+     * Replace a reference node with external reference in aws gateway
+     */
+    private void replaceExternalRef(RestApi api, ObjectNode parent, String schemaName) {
+        parent.set("$ref", new TextNode("https://apigateway.amazonaws.com/restapis/"+ api.getId() + "/models/" + schemaName));
     }
 
     /*
