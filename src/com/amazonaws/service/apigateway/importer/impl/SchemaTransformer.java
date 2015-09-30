@@ -60,16 +60,17 @@ public class SchemaTransformer {
 
             // JsonNode subSchema = getSchema(schemaName, models);
 
-            // replace reference values with external reference
-
-            replaceExternalRef(api, (ObjectNode) refs.get(ref), schemaName);
-
             // replace reference values with inline definitions
             //replaceRef((ObjectNode) refs.get(ref), schemaName);
 
             // buildSchemaReferenceMap(subSchema, models, modelMap);
 
             //modelMap.put(schemaName, serializeExisting(subSchema));
+
+            // replace reference values with external reference
+
+            replaceExternalRef(api, (ObjectNode) refs.get(ref), schemaName);
+
         }
     }
 
