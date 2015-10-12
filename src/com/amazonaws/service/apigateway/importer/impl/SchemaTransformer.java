@@ -52,7 +52,7 @@ public class SchemaTransformer {
     private void buildSchemaReferenceMap(RestApi api, JsonNode model, JsonNode models, Map<String, String> modelMap) {
         Map<JsonNode, JsonNode> refs = new HashMap<>();
         findReferences(model, refs);
-
+        LOG.info("refs:" + refs);
         for (JsonNode ref : refs.keySet()) {
             String canonicalRef = ref.textValue();
 
@@ -68,7 +68,9 @@ public class SchemaTransformer {
             //modelMap.put(schemaName, serializeExisting(subSchema));
 
             // replace reference values with external reference
-
+            LOG.info("ref: " + ref);
+            LOG.info("refs.get(ref): " + refs.get(ref));
+            LOG.info("schemaName: " + schemaName);
             replaceExternalRef(api, (ObjectNode) refs.get(ref), schemaName);
 
         }
@@ -81,9 +83,11 @@ public class SchemaTransformer {
     private String getFlattened(RestApi api, JsonNode model, JsonNode models) {
         HashMap<String, String> schemaMap = new HashMap<>();
 
-        buildSchemaReferenceMap(api, model, models, schemaMap);
+        //buildSchemaReferenceMap(api, model, models, schemaMap);
 
-        replaceRefs(model, schemaMap);
+        //replaceRefs(model, schemaMap);
+
+        replaceExternalRefs(api, model);
 
         if (LOG.isTraceEnabled()) {
             try {
@@ -141,7 +145,21 @@ public class SchemaTransformer {
      * Replace a reference node with external reference in aws gateway
      */
     private void replaceExternalRef(RestApi api, ObjectNode parent, String schemaName) {
+        LOG.info("Replacing node: " + parent + ", schema: " + schemaName );
         parent.set("$ref", new TextNode("https://apigateway.amazonaws.com/restapis/"+ api.getId() + "/models/" + schemaName));
+    }
+
+    private void replaceExternalRefs(RestApi api, JsonNode node){
+        JsonNode refNode = node.path("$ref");
+        if (!refNode.isMissingNode()) {
+            String canonicalRef = refNode.textValue();
+            String schemaName = getSchemaName(canonicalRef);
+            replaceExternalRef(api, (ObjectNode)node, schemaName);
+        }
+
+        for (JsonNode child : node) {
+            replaceExternalRefs(api, child);
+        }
     }
 
     /*
@@ -150,6 +168,7 @@ public class SchemaTransformer {
     private void findReferences(JsonNode node, Map<JsonNode, JsonNode> refNodes) {
         JsonNode refNode = node.path("$ref");
         if (!refNode.isMissingNode()) {
+            LOG.info("find node: " + node + ", refNode: " + refNode);
             refNodes.put(refNode, node);
         }
 
